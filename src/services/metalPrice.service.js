@@ -26,6 +26,9 @@ const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
 function transformData(data) {
   data.rates.XAG = troyOunceToGram(data.rates.XAG);
   data.rates.XAU = troyOunceToGram(data.rates.XAU);
+  if (!data.info) {
+    data.info = {};
+  }
   return data;
 }
 
@@ -41,23 +44,34 @@ export function transformAndCompareData(rawData, dbData) {
       let meanDiffPorXAG = null;
       let meanDiffPorXAU = null;
 
-      if (dbData && dbData.length >= 600) {
-          const lastTenHoursData = dbData.slice(0, 600);
+      if (dbData && dbData.length >= Math.floor(HOURS_TO_SAVE_MS / UPDATE_FREQUENCY_MS) - 1) {
+          const lastTenHoursData = dbData.slice(0, dbData.length - 1);
+          console.log("Last ten hours data: ", lastTenHoursData);
           const sumXAG = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAG, 0);
           const sumXAU = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAU, 0);
           meanXAG = sumXAG / lastTenHoursData.length;
           meanXAU = sumXAU / lastTenHoursData.length;
+          console.log("mean values: ", meanXAG, meanXAU)
 
           // Calculate the difference between current prices and mean prices
           meanDiffPorXAG = ((transformedData.rates.XAG - meanXAG) / meanXAG) * 100;
           meanDiffPorXAU = ((transformedData.rates.XAU - meanXAU) / meanXAU) * 100;
 
+          transformedData.info.mean_diff_xag = meanDiffPorXAG;
+          transformedData.info.mean_diff_xau = meanDiffPorXAU;
+
           // Check if meanDiffPorXAG passes the threshold
-          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR) {
-              transformedData.info.high_mean_diff_xag = true;
+          if (meanDiffPorXAU >= THRESHOLD_LIMIT_POR) {
+              transformedData.info.high_mean_diff_xau = true;
           } else {
-              transformedData.info.high_mean_diff_xag = false;
+              transformedData.info.high_mean_diff_xau = false;
           }
+
+          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR) {
+            transformedData.info.high_mean_diff_xag = true;
+        } else {
+            transformedData.info.high_mean_diff_xag = false;
+        }
       }
 
       return transformedData;
@@ -153,7 +167,7 @@ export async function setDbData(payload) {
     const expirationTimestamp = Date.now() + HOURS_TO_SAVE_MS;
     const data = JSON.stringify({ ...payload, expirationTimestamp });
     await db.lpush("metalPrices", data);
-    await db.ltrim("metalPrices", 0, Math.floor(HOURS_TO_SAVE_MS / UPDATE_FREQUENCY_MS) - 1); // Keep entries for the specified hours
+    await db.ltrim("metalPrices", 0, Math.floor(HOURS_TO_SAVE_MS / UPDATE_FREQUENCY_MS)); // Keep entries for the specified hours
 
     // confirm that it was set displaying the data set in the db
     console.log("Data set in the database: ", data);
