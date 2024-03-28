@@ -10,10 +10,11 @@ const PORT = process.env.PORT || 8000;
 
 const server = app.listen(PORT, () => {
   logger.info(`Server running at port: ${PORT}`);
+  // Start the background update task
+  console.log("Starting background update task");
+  startBackgroundUpdateTask();
 });
 
-// Start the background update task
-startBackgroundUpdateTask();
 
 // Handling errors (uncaught exceptions and unhandled rejections)
 const unexpectedErrorHandler = (error) => {

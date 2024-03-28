@@ -9,6 +9,20 @@ import {
   isCurrentTimeInsideInterval,
 } from "../utils/time.util.js";
 
+dotenv.config();
+const {
+  API_KEY,
+  STD_CURRENCY,
+  HOURS_TO_SAVE,
+  UPDATE_FREQUENCY_MINUTES,
+  THRESHOLD_LIMIT_POR
+} = process.env;
+const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
+
+// Convert hours to save and update frequency to milliseconds
+const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
+const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
+
 function transformData(data) {
   data.rates.XAG = troyOunceToGram(data.rates.XAG);
   data.rates.XAU = troyOunceToGram(data.rates.XAU);
@@ -17,41 +31,47 @@ function transformData(data) {
 
 // Function to transform data and compare mean prices
 export function transformAndCompareData(rawData, dbData) {
-  // Transform raw data to gram
-  const transformedData = transformData(rawData);
+  try {
+      // Transform raw data to gram
+      const transformedData = transformData(rawData);
 
-  // Calculate mean prices for XAG and XAU from the last 10 hours if dbData is available
-  let meanXAG = null;
-  let meanXAU = null;
-  let meanDiffPorXAG = null;
-  let meanDiffPorXAU = null;
+      // Calculate mean prices for XAG and XAU from the last 10 hours if dbData is available
+      let meanXAG = null;
+      let meanXAU = null;
+      let meanDiffPorXAG = null;
+      let meanDiffPorXAU = null;
 
-  if (dbData && dbData.length >= 600) {
-    const lastTenHoursData = dbData.slice(0, 600);
-    const sumXAG = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAG, 0);
-    const sumXAU = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAU, 0);
-    meanXAG = sumXAG / lastTenHoursData.length;
-    meanXAU = sumXAU / lastTenHoursData.length;
+      if (dbData && dbData.length >= 600) {
+          const lastTenHoursData = dbData.slice(0, 600);
+          const sumXAG = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAG, 0);
+          const sumXAU = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAU, 0);
+          meanXAG = sumXAG / lastTenHoursData.length;
+          meanXAU = sumXAU / lastTenHoursData.length;
 
-    // Calculate the difference between current prices and mean prices
-    meanDiffPorXAG = ((transformedData.rates.XAG - meanXAG) / meanXAG) * 100;
-    meanDiffPorXAU = ((transformedData.rates.XAU - meanXAU) / meanXAU) * 100;
+          // Calculate the difference between current prices and mean prices
+          meanDiffPorXAG = ((transformedData.rates.XAG - meanXAG) / meanXAG) * 100;
+          meanDiffPorXAU = ((transformedData.rates.XAU - meanXAU) / meanXAU) * 100;
+
+          // Check if meanDiffPorXAG passes the threshold
+          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR) {
+              transformedData.info.high_mean_diff_xag = true;
+          } else {
+              transformedData.info.high_mean_diff_xag = false;
+          }
+      }
+
+      return transformedData;
+  } catch (e) {
+      // Handle any exceptions (e.g., invalid data, missing keys, etc.)
+      console.error(`Error occurred: ${e}`);
+      return null;
   }
-
-  // Add mean prices and differences to the data
-  transformedData.info = {
-    meanDiffPorXAG,
-    meanDiffPorXAU
-  };
-
-  return transformedData;
 }
 
 
 
-export function shouldUpdateData(expirationTimeStamp) {
+export function shouldUpdateData() {
   if (
-    expirationTimeStamp - Date.now() < 0 &&
     !isWeekend(currentTime()) &&
     isCurrentTimeInsideInterval()
   ) {
@@ -60,23 +80,12 @@ export function shouldUpdateData(expirationTimeStamp) {
   return false;
 }
 
-dotenv.config();
-const {
-  API_KEY,
-  STD_CURRENCY,
-  HOURS_TO_SAVE,
-  UPDATE_FREQUENCY_MINUTES
-} = process.env;
-const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
 
-// Convert hours to save and update frequency to milliseconds
-const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
-const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
-
-async function updateAndSetMetalPrices() {
+export async function updateAndSetMetalPrices() {
   try {
     const updatedData = await getUpdatedMetalPrices();
-    await setDbData(updatedData);
+    const transformedData = transformAndCompareData(updatedData, await getDbData()); // Renamed variable here
+    await setDbData(transformedData);
   } catch (error) {
     console.error("Error updating and setting metal prices:", error);
   }
@@ -85,7 +94,9 @@ async function updateAndSetMetalPrices() {
 // Function to start background update task
 export function startBackgroundUpdateTask() {
   setInterval(async () => {
-    if (shouldUpdateData(Date.now())) {
+    console.log("loop 1")
+    if (shouldUpdateData()) {
+      console.log("loop 1 has passed")
       updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
     }
   }, UPDATE_FREQUENCY_MS);
@@ -117,14 +128,19 @@ export async function getUpdatedMetalPrices(chosenCurrency = STD_CURRENCY) {
 export async function getDbData() {
   try {
     let data = await db.lrange("metalPrices", 0, -1);
-    console.log("Retrieved data from Redis:", data);
-    if (data.length === 0) {
-      // If the list is empty, fetch updated data
-      const updatedData = await getUpdatedMetalPrices();
-      await setDbData(updatedData);
-      // Fetch the data again after updating
-      data = await db.lrange("metalPrices", 0, -1);
-    }
+   
+    return data.map(JSON.parse);
+  } catch (error) {
+    console.error("Error retrieving data from Redis:", error);
+    throw createHttpError(500, "Failed to get data from the database.");
+  }
+}
+
+export async function getlastDbData() {
+  try {
+    let data = await db.lrange("metalPrices", 0, 0);
+    console.log("Retrieved last data from Redis:", data);
+    
     return data.map(JSON.parse);
   } catch (error) {
     console.error("Error retrieving data from Redis:", error);
