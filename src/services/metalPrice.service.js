@@ -22,6 +22,7 @@ const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
 // Convert hours to save and update frequency to milliseconds
 const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
 const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
+const THRESHOLD_LIMIT_VAL = THRESHOLD_LIMIT_POR / 100;
 
 function transformData(data) {
   data.rates.XAG = troyOunceToGram(data.rates.XAG);
@@ -31,6 +32,40 @@ function transformData(data) {
   }
   return data;
 }
+
+function shouldTriggerAlarm(transformedData) {
+  const meanDiffs = transformedData.info;
+  const timestamp = transformedData.timestamp;
+
+  // Check if the timestamp is close to midnight
+  const currentHour = timestamp.getHours();
+  const currentMinute = timestamp.getMinutes();
+  
+  if ((currentHour === 0 && currentMinute <= 3) || (currentHour === 23 && currentMinute >= 57)) {
+    // Reset the emailSent flag if it's close to midnight
+    emailSent = false;
+  }
+
+  // Check if the difference in mean diff exceeds the threshold (0.01)
+  if (
+    Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_VAL ||
+    Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_VAL
+  ) {
+    // If an email hasn't been sent yet, or if the change exceeds 0.01
+    // since the last email, send the email
+    if (!emailSent || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_VAL*2) || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_VAL*2)) {
+      emailSent = true;
+      // Update previousMeanDiffs with the current mean diffs
+      previousMeanDiffs.XAG = meanDiffs.mean_diff_xag;
+      previousMeanDiffs.XAU = meanDiffs.mean_diff_xau;
+      return true;
+    }
+  }
+
+  // If the conditions are not met, no need to trigger an email
+  return false;
+}
+
 
 // Function to transform data and compare mean prices
 export function transformAndCompareData(rawData, dbData) {
@@ -46,12 +81,12 @@ export function transformAndCompareData(rawData, dbData) {
 
       if (dbData && dbData.length >= Math.floor(HOURS_TO_SAVE_MS / UPDATE_FREQUENCY_MS) - 1) {
           const lastTenHoursData = dbData.slice(0, dbData.length - 1);
-          console.log("Last ten hours data: ", lastTenHoursData);
+          //console.log("Last ten hours data: ", lastTenHoursData);
           const sumXAG = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAG, 0);
           const sumXAU = lastTenHoursData.reduce((acc, curr) => acc + curr.rates.XAU, 0);
           meanXAG = sumXAG / lastTenHoursData.length;
           meanXAU = sumXAU / lastTenHoursData.length;
-          console.log("mean values: ", meanXAG, meanXAU)
+          //console.log("mean values: ", meanXAG, meanXAU)
 
           // Calculate the difference between current prices and mean prices
           meanDiffPorXAG = ((transformedData.rates.XAG - meanXAG) / meanXAG) * 100;
@@ -95,18 +130,39 @@ export function shouldUpdateData() {
 }
 
 
-export async function updateAndSetMetalPrices() {
-  try {
-    const updatedData = await getUpdatedMetalPrices();
-    const transformedData = transformAndCompareData(updatedData, await getDbData()); // Renamed variable here
-    await setDbData(transformedData);
-  } catch (error) {
-    console.error("Error updating and setting metal prices:", error);
+export async function updateAndSetMetalPrices(first=false) {
+  if (first) {
+    console.log("loop 2")
+    const dbdata = await getDbData();
+    if (dbdata.length === 0) {
+      try {
+        const updatedData = await getUpdatedMetalPrices();
+        const transformedData = transformAndCompareData(updatedData, dbdata); // Renamed variable here
+        await setDbData(transformedData);
+      } catch (error) {
+        console.error("Error updating and setting metal prices:", error);
+    }
+  }
+  } else {
+    try {
+      const updatedData = await getUpdatedMetalPrices();
+      const transformedData = transformAndCompareData(updatedData, await getDbData()); // Renamed variable here
+
+      if (shouldTriggerAlarm(transformedData)) {
+        console.log("Triggering alarm");
+        await sendAlarmEmail(transformedData);
+      }
+
+      await setDbData(transformedData);
+    } catch (error) {
+      console.error("Error updating and setting metal prices:", error);
+    }
   }
 }
 
 // Function to start background update task
 export function startBackgroundUpdateTask() {
+  let first;
   setInterval(async () => {
     console.log("loop 1")
     if (shouldUpdateData()) {
@@ -115,9 +171,10 @@ export function startBackgroundUpdateTask() {
     }
   }, UPDATE_FREQUENCY_MS);
 
+  updateAndSetMetalPrices(first=true);
   // Call updateAndSetMetalPrices immediately when the application starts
-  updateAndSetMetalPrices();
 }
+
 
 export async function getUpdatedMetalPrices(chosenCurrency = STD_CURRENCY) {
   try {
@@ -154,8 +211,13 @@ export async function getlastDbData() {
   try {
     let data = await db.lrange("metalPrices", 0, 0);
     console.log("Retrieved last data from Redis:", data);
-    
-    return data.map(JSON.parse);
+
+    if (Array.isArray(data) && data.length > 0) {
+      // If data is an array and not empty, parse the first element
+      return JSON.parse(data[0]);
+    } else {
+      return null; // or handle the case where there's no data
+    }
   } catch (error) {
     console.error("Error retrieving data from Redis:", error);
     throw createHttpError(500, "Failed to get data from the database.");

@@ -4,8 +4,8 @@ import { getMetalPrice, getAllMetalPrices } from "../controllers/metalPrice.cont
 
 const router = express.Router();
 
-router.route("/latest").get(trimRequest.all, getMetalPrice);
+router.route("/latest").get(trimRequest.body, getMetalPrice);
 
-router.route("/all").get(trimRequest.all, getAllMetalPrices);
+router.route("/all").get(trimRequest.body, getAllMetalPrices);
 
 export default router;

@@ -1,14 +1,14 @@
 import dotenv from "dotenv";
 import logger from "./configs/logger.config.js";
 import app from "./app.js";
-import db from "./db/db.js";
-import { startBackgroundUpdateTask } from "./services/metalPrice.service.js";
+
+import {startBackgroundUpdateTask} from "./services/metalPrice.service.js";
 
 dotenv.config();
 
 const PORT = process.env.PORT || 8000;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT,  async () => {
   logger.info(`Server running at port: ${PORT}`);
   // Start the background update task
   console.log("Starting background update task");
