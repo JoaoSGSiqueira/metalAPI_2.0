@@ -129,4 +129,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-.src/configs/SendGridKey.json
+# keys for sendgrid
+src/configs/SendGridKeys.json
