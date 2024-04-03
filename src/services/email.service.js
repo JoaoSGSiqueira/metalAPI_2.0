@@ -122,7 +122,7 @@ export async function sendEmail(recipients, subject, html_content) {
   }
 }
 
-export async function generateAndSendEmail(jsonData) {
+export async function sendAlarmEmail(jsonData) {
   try {
     const { html, subject } = await gerarHtmlAvisoPrecos(jsonData);
     await sendEmail(["contato@ybybank.com.br"], subject, html);

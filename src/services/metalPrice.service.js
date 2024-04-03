@@ -7,6 +7,7 @@ import { troyOunceToGram } from "../utils/valueConvertion.util.js";
 
 import { shouldTriggerAlarm, shouldUpdateData } from "../utils/validation.util.js";
 import { findClosestPassedTime, timeDifference } from "../utils/time.util.js";
+import { sendAlarmEmail } from "../services/email.service.js";
 
 dotenv.config();
 const {
@@ -119,7 +120,7 @@ export async function updateAndSetMetalPrices(first=false) {
 
       if (shouldTriggerAlarm(transformedData)) {
         console.log("Triggering alarm");
-        //await sendAlarmEmail(transformedData);
+        await sendAlarmEmail(transformedData);
       }
 
       await setDbData(transformedData);
