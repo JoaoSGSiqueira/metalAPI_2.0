@@ -1,15 +1,6 @@
 import moment from 'moment';
-import dotenv from "dotenv";
 
-import {
-    currentTime,
-    isWeekend,
-    isCurrentTimeInsideInterval
-  } from "../utils/time.util.js";
-
-dotenv.config();
-
-const {THRESHOLD_LIMIT_POR} = process.env;
+const THRESHOLD_LIMIT_POR = 1;
 let previousMeanDiffs = { XAG: 0, XAU: 0};
 let emailSent_xag = false;
 let emailSent_xau = false;
@@ -59,13 +50,60 @@ export function shouldTriggerAlarm(transformedData) {
     return false;
   }
 
-  
-  export function shouldUpdateData() {
-    if (
-      !isWeekend(currentTime()) &&
-      isCurrentTimeInsideInterval()
-    ) {
-      return true;
-    }
-    return false;
-  }
+  const jsonData = {
+    "success": true,
+    "base": "BRL",
+    "timestamp": 1712082564,
+    "rates": {
+      "XAG": 4.216850269436439,
+      "XAU": 369.0512282707107
+    },
+    "info": {
+      "mean_diff_xag": -1.1137635232325524,
+      "mean_diff_xau": -0.004249402376749703,
+      "high_mean_diff_xau": true,
+      "high_mean_diff_xag": true
+    },
+    "expirationTimestamp": 1712082796833
+  };
+
+  const jsonData2 = {
+    "success": true,
+    "base": "BRL",
+    "timestamp": 1712082564,
+    "rates": {
+      "XAG": 4.216850269436439,
+      "XAU": 369.0512282707107
+    },
+    "info": {
+      "mean_diff_xag": -1.1137635232325524,
+      "mean_diff_xau": -0.004249402376749703,
+      "high_mean_diff_xau": true,
+      "high_mean_diff_xag": true
+    },
+    "expirationTimestamp": 1712082796833
+  };
+
+    const jsonData3 = {
+        "success": true,
+    "base": "BRL",
+    "timestamp": 1712082564,
+    "rates": {
+      "XAG": 4.216850269436439,
+      "XAU": 369.0512282707107
+    },
+    "info": {
+      "mean_diff_xag": -1.1137635232325524,
+      "mean_diff_xau": -1.004249402376749703,
+      "high_mean_diff_xau": true,
+      "high_mean_diff_xag": true
+    },
+    "expirationTimestamp": 1712082796833
+  };
+
+
+// test function
+
+console.log(shouldTriggerAlarm(jsonData)); // true
+console.log(shouldTriggerAlarm(jsonData2)); // false
+console.log(shouldTriggerAlarm(jsonData3)); // true

@@ -1,7 +1,13 @@
-function gerarHtmlAvisoPrecos(jsonData) {
+import sgMail from '@sendgrid/mail';
+import { readFile } from 'fs/promises';
+
+async function gerarHtmlAvisoPrecos(jsonData) {
+  let subject = '🚨 ** Valor Instavel ** 🚨';
   // Obtém os valores do JSON
   const prata = Number(jsonData.rates.XAG.toFixed(2));
   const ouro = Number(jsonData.rates.XAU.toFixed(2));
+  const Pratadiff = (jsonData.info.mean_diff_xag.toFixed(2));
+  const Ourodiff = (jsonData.info.mean_diff_xau.toFixed(2));
   const altaPrata = jsonData.info.high_mean_diff_xag;
   const altaOuro = jsonData.info.high_mean_diff_xau;
 
@@ -35,18 +41,28 @@ function gerarHtmlAvisoPrecos(jsonData) {
 
   // Verifica se há indicação de alta para prata
   if (altaPrata) {
+    if (jsonData.info.mean_diff_xag > 1) {
+      subject = `🚨 **Valor Subiu da Prata R$${prata}** 🚨`;
+    } if (jsonData.info.mean_diff_xag < -1 ) {
+      subject = `🚨 **Valor Desceu da Prata R$${prata}** 🚨`;
+    }
     html += `
       <div class="mensagem">
-        <p>Há indicação de <strong>variação alta</strong> nos preços da <strong>prata</strong>. Valor atual: R$<span style="color: red">${prata}</span></p>
+        <p>Há indicação de <strong>variação alta</strong> nos preços da <strong>prata</strong>. Valor atual: R$<span style="color: red">${prata}</span> Porcentagem da mudança ${Pratadiff}%</p>
       </div>
     `;
   }
 
   // Verifica se há indicação de alta para ouro
   if (altaOuro) {
+    if (jsonData.info.mean_diff_xau > 1) {
+      subject = `🚨 **Valor Subiu do Ouro R$${ouro}** 🚨`;
+    } if (jsonData.info.mean_diff_xau < -1 ) {
+      subject = `🚨 **Valor Desceu do Ouro R$${ouro}** 🚨`;
+    }
     html += `
       <div class="mensagem">
-        <p>Há indicação de <strong>variação alta</strong> nos preços do <strong>ouro</strong>. Valor atual: R$<span style="color: red">${ouro}</span></p>
+        <p>Há indicação de <strong>variação alta</strong> nos preços do <strong>ouro</strong>. Valor atual: R$<span style="color: red">${ouro}</span> Porcentagem da mudança ${Ourodiff}%</p>
       </div>
     `;
   }
@@ -55,7 +71,7 @@ function gerarHtmlAvisoPrecos(jsonData) {
   if (!altaOuro) {
     html += `
       <div class="mensagem">
-        <p><strong>Não</strong> há indicação de <strong>variação alta</strong> nos preços da <strong>prata</strong>. Valor atual: R$<span style="color: green">${prata}</span></p>
+        <><strong>Não</strong> há indicação de <strong>variação alta</strong> nos preços da <strong>prata</strong>. Valor atual: R$<span style="color: green">${prata}</span> Porcentagem da mudança ${Pratadiff}%</p>
       </div>
     `;
   }
@@ -64,7 +80,7 @@ function gerarHtmlAvisoPrecos(jsonData) {
   if (!altaPrata) {
     html += `
       <div class="mensagem">
-        <p><strong>Não</strong> há indicação de <strong>variação alta</strong> nos preços do <strong>ouro</strong>. Valor atual: R$<span style="color: green">${ouro}</span></p>
+        <p><strong>Não</strong> há indicação de <strong>variação alta</strong> nos preços do <strong>ouro</strong>. Valor atual: R$<span style="color: green">${ouro}</span> Porcentagem da mudança ${Ourodiff}%</p> 
       </div>
     `;
   }
@@ -75,7 +91,7 @@ function gerarHtmlAvisoPrecos(jsonData) {
     </html>
   `;
 
-  return html;
+  return {html, subject};
 }
 
 
@@ -91,7 +107,7 @@ const jsonData = {
     "XAU": 369.0512282707107
   },
   "info": {
-    "mean_diff_xag": -0.0011137635232325524,
+    "mean_diff_xag": -1.1137635232325524,
     "mean_diff_xau": -0.004249402376749703,
     "high_mean_diff_xau": true,
     "high_mean_diff_xag": true
@@ -99,33 +115,40 @@ const jsonData = {
   "expirationTimestamp": 1712082796833
 };
 
-const htmlAvisoPrecos = gerarHtmlAvisoPrecos(jsonData);
-console.log(htmlAvisoPrecos);
+export async function sendEmail(recipients, subject, html_content) {
+  try {
+    const sendGridKeys = JSON.parse(await readFile('src/configs/sendGridKeys.json'));
+    const { key, senderEmail } = sendGridKeys;
 
+    sgMail.setApiKey(key);
 
-export async function sendEmail(recipient, subject, html_content) {
-  const sendGridSecret = JSON.parse(await wixSecretsBackend.getSecret('SendGridSecret'));
-  const key = sendGridSecret.key;
-  const senderEmail = sendGridSecret.senderEmail;
-
-  sgMail.setApiKey(key);
-
-  const msg = {
-      to: recipient,
+    const msg = {
+      to: recipients,
       from: senderEmail,
       subject: subject,
       html: html_content,
-  }
+    };
 
-  try {
+    try {
+      // Your code to send the email
       const response = await sgMail.send(msg);
       return [response[0].statusCode, response[0].headers];
+    } catch (error) {
+      console.error("SendGrid API Error:", error.response.body.errors);
+      throw error; // Rethrow the error to propagate it further if needed
+    }
   } catch (error) {
-      console.error(error);
+    console.error("Error reading SendGrid keys:", error);
+    throw error; // Rethrow the error to propagate it further if needed
   }
 }
 
+
+const {html, subject} = await gerarHtmlAvisoPrecos(jsonData);
+
 // Exemplo de uso
-const recipient = 'mayara@ybybank.comm.br'
-const subject = 'Indicação de Alta de Preços';
-const html_content = htmlAvisoPrecos;
+const recipients = ['dados@ybybank.com.br', 'contato@ybybank.com.br']
+console.log('Generated HTML:', html);
+console.log('Subject:', subject);
+const response = await sendEmail(recipients, subject, html);
+console.log(response);
