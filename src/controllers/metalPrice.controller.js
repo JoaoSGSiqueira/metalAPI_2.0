@@ -33,7 +33,6 @@ export const getAllMetalPrices = async (req, res, next) => {
 export const getClosestMetalPrice = async (req, res, next) => {
   try {
     const allData = await getDbData();
-    console.log(allData)
     const closestData = await getClosestMetalPriceData(['08:00', '12:00'], allData);
     return res.json(closestData);
   } catch (error) {

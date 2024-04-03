@@ -203,9 +203,8 @@ export async function getClosestMetalPriceData(hours, data) {
           const currentHour = moment(entry.timestamp * 1000).format('HH');
           const currentMinute = moment(entry.timestamp * 1000).format('mm');
           const stringTime = `${currentHour}:${currentMinute}`;
-          console.log(stringTime);
+
           const difference = timeDifference(stringTime, closestTime);
-          console.log(difference);
 
           if (difference === 0) {
               closestData = entry;
