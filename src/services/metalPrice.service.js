@@ -1,5 +1,6 @@
 // Import dependencies
 import dotenv from "dotenv";
+import moment from "moment";
 import createHttpError from "http-errors";
 import db from "../db/db.js";
 import { troyOunceToGram } from "../utils/valueConvertion.util.js";
@@ -22,7 +23,6 @@ const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
 // Convert hours to save and update frequency to milliseconds
 const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
 const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
-const THRESHOLD_LIMIT_VAL = THRESHOLD_LIMIT_POR / 100;
 
 function transformData(data) {
   data.rates.XAG = troyOunceToGram(data.rates.XAG);
@@ -34,12 +34,20 @@ function transformData(data) {
 }
 
 function shouldTriggerAlarm(transformedData) {
+  let previousMeanDiffs = { XAG: 0, XAU: 0};
+  let emailSent = false;
+
+  if (!transformedData.info.mean_diff_xag || !transformedData.info.mean_diff_xau) {
+    return false;
+  }
+
   const meanDiffs = transformedData.info;
   const timestamp = transformedData.timestamp;
 
   // Check if the timestamp is close to midnight
-  const currentHour = timestamp.getHours();
-  const currentMinute = timestamp.getMinutes();
+  const currentHour = moment(timestamp, 'HH');
+  const currentMinute = moment(timestamp, 'mm');
+
   
   if ((currentHour === 0 && currentMinute <= 3) || (currentHour === 23 && currentMinute >= 57)) {
     // Reset the emailSent flag if it's close to midnight
@@ -48,12 +56,12 @@ function shouldTriggerAlarm(transformedData) {
 
   // Check if the difference in mean diff exceeds the threshold (0.01)
   if (
-    Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_VAL ||
-    Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_VAL
+    Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_POR ||
+    Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_POR
   ) {
     // If an email hasn't been sent yet, or if the change exceeds 0.01
     // since the last email, send the email
-    if (!emailSent || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_VAL*2) || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_VAL*2)) {
+    if (!emailSent || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_POR) || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_POR)) {
       emailSent = true;
       // Update previousMeanDiffs with the current mean diffs
       previousMeanDiffs.XAG = meanDiffs.mean_diff_xag;
@@ -132,9 +140,9 @@ export function shouldUpdateData() {
 
 export async function updateAndSetMetalPrices(first=false) {
   if (first) {
-    console.log("loop 2")
     const dbdata = await getDbData();
     if (dbdata.length === 0) {
+      console.log("First time running the application, setting metal prices...")
       try {
         const updatedData = await getUpdatedMetalPrices();
         const transformedData = transformAndCompareData(updatedData, dbdata); // Renamed variable here
@@ -142,6 +150,8 @@ export async function updateAndSetMetalPrices(first=false) {
       } catch (error) {
         console.error("Error updating and setting metal prices:", error);
     }
+  } else {
+    console.log('There is already data in the database, skipping...')
   }
   } else {
     try {
@@ -150,7 +160,7 @@ export async function updateAndSetMetalPrices(first=false) {
 
       if (shouldTriggerAlarm(transformedData)) {
         console.log("Triggering alarm");
-        await sendAlarmEmail(transformedData);
+        //await sendAlarmEmail(transformedData);
       }
 
       await setDbData(transformedData);
@@ -164,9 +174,8 @@ export async function updateAndSetMetalPrices(first=false) {
 export function startBackgroundUpdateTask() {
   let first;
   setInterval(async () => {
-    console.log("loop 1")
+    console.log("1 minute passed updating data...")
     if (shouldUpdateData()) {
-      console.log("loop 1 has passed")
       updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
     }
   }, UPDATE_FREQUENCY_MS);
@@ -235,5 +244,70 @@ export async function setDbData(payload) {
     console.log("Data set in the database: ", data);
   } catch (error) {
     throw createHttpError(500, "Failed to set data in the database.");
+  }
+}
+
+// Function to calculate the time difference between two time strings
+function timeDifference(time1, time2) {
+  const momentTime1 = moment(time1, 'HH:mm');
+  const momentTime2 = moment(time2, 'HH:mm');
+  return Math.abs(momentTime1.diff(momentTime2, 'minutes'));
+}
+
+// Function to find the closest time within a list of times that has already passed
+function findClosestPassedTime(currentTime, times) {
+  let closestTime = null;
+  let minDifference = Infinity;
+
+  const currentMoment = moment(currentTime, 'HH:mm');
+
+  for (const time of times) {
+    const momentTime = moment(time, 'HH:mm');
+    
+    // Check if the time has already passed
+    if (momentTime.isBefore(currentMoment)) {
+      const difference = currentMoment.diff(momentTime, 'minutes');
+      
+      // If it's the closest passed time found so far, update closestTime and minDifference
+      if (difference < minDifference) {
+        minDifference = difference;
+        closestTime = time;
+      }
+    }
+  }
+
+  return closestTime;
+}
+
+export async function getClosestMetalPriceData(hours, data) {
+  try {
+      const currentTime = moment().format('HH:mm');
+      const closestTime = findClosestPassedTime(currentTime, hours);
+      let closestData = null;
+      let minDifference = Infinity; // Initialize minDifference with a very large value
+
+      for (const entry of data) {
+          const currentHour = moment(entry.timestamp * 1000).format('HH');
+          const currentMinute = moment(entry.timestamp * 1000).format('mm');
+          const stringTime = `${currentHour}:${currentMinute}`;
+          console.log(stringTime);
+          const difference = timeDifference(stringTime, closestTime);
+          console.log(difference);
+
+          if (difference === 0) {
+              closestData = entry;
+              break; // No need to continue searching if zero difference found
+          }
+
+          if (difference < minDifference) {
+              minDifference = difference;
+              closestData = entry; // Update closestData to the current entry
+          }
+      }
+
+      return closestData;
+  } catch (error) {
+      console.error("Error retrieving data from Redis:", error);
+      throw createHttpError(500, "Failed to get data from the database.");
   }
 }
