@@ -1,9 +1,9 @@
 import dotenv from "dotenv";
+import moment from "moment";
 
 dotenv.config();
 
 const {
-  UPDATE_FREQUENCY_MINUTES = 1,
   START_TIME = "10:30",
   END_TIME = "18:00",
 } = process.env;
@@ -19,26 +19,6 @@ export const getCurrentTimeInSaoPaulo = () => {
 
 export const currentTime = () => {
   return getCurrentTimeInSaoPaulo().getTime();
-};
-
-export const createExpirationTime = () => {
-  const currentTimeInSaoPaulo = getCurrentTimeInSaoPaulo();
-  currentTimeInSaoPaulo.setMinutes(
-    currentTimeInSaoPaulo.getMinutes() + parseInt(UPDATE_FREQUENCY_MINUTES, 10)
-  );
-  return currentTimeInSaoPaulo.getTime();
-};
-
-export const formatTimestampToString = (timestamp) => {
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
 export const isWeekend = (spTimestamp) => {
@@ -72,3 +52,36 @@ export const isCurrentTimeInsideInterval = () => {
     currentDate.getTime() <= endDate.getTime()
   );
 };
+
+
+// Function to calculate the time difference between two time strings
+export function timeDifference(time1, time2) {
+  const momentTime1 = moment(time1, 'HH:mm');
+  const momentTime2 = moment(time2, 'HH:mm');
+  return Math.abs(momentTime1.diff(momentTime2, 'minutes'));
+}
+
+// Function to find the closest time within a list of times that has already passed
+export function findClosestPassedTime(currentTime, times) {
+  let closestTime = null;
+  let minDifference = Infinity;
+
+  const currentMoment = moment(currentTime, 'HH:mm');
+
+  for (const time of times) {
+    const momentTime = moment(time, 'HH:mm');
+    
+    // Check if the time has already passed
+    if (momentTime.isBefore(currentMoment)) {
+      const difference = currentMoment.diff(momentTime, 'minutes');
+      
+      // If it's the closest passed time found so far, update closestTime and minDifference
+      if (difference < minDifference) {
+        minDifference = difference;
+        closestTime = time;
+      }
+    }
+  }
+
+  return closestTime;
+}

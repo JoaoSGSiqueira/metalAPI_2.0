@@ -4,11 +4,9 @@ import moment from "moment";
 import createHttpError from "http-errors";
 import db from "../db/db.js";
 import { troyOunceToGram } from "../utils/valueConvertion.util.js";
-import {
-  currentTime,
-  isWeekend,
-  isCurrentTimeInsideInterval,
-} from "../utils/time.util.js";
+
+import { shouldTriggerAlarm, shouldUpdateData } from "../utils/validation.util.js";
+import { findClosestPassedTime, timeDifference } from "../utils/time.util.js";
 
 dotenv.config();
 const {
@@ -24,6 +22,21 @@ const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
 const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
 const UPDATE_FREQUENCY_MS = UPDATE_FREQUENCY_MINUTES * 60 * 1000;
 
+// Function to start background update task
+export function startBackgroundUpdateTask() {
+  let first;
+  setInterval(async () => {
+    console.log("1 minute passed updating data...")
+    if (shouldUpdateData()) {
+      updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
+    }
+  }, UPDATE_FREQUENCY_MS);
+
+  updateAndSetMetalPrices(first=true);
+  // Call updateAndSetMetalPrices immediately when the application starts
+}
+
+
 function transformData(data) {
   data.rates.XAG = troyOunceToGram(data.rates.XAG);
   data.rates.XAU = troyOunceToGram(data.rates.XAU);
@@ -32,48 +45,6 @@ function transformData(data) {
   }
   return data;
 }
-
-function shouldTriggerAlarm(transformedData) {
-  let previousMeanDiffs = { XAG: 0, XAU: 0};
-  let emailSent = false;
-
-  if (!transformedData.info.mean_diff_xag || !transformedData.info.mean_diff_xau) {
-    return false;
-  }
-
-  const meanDiffs = transformedData.info;
-  const timestamp = transformedData.timestamp;
-
-  // Check if the timestamp is close to midnight
-  const currentHour = moment(timestamp, 'HH');
-  const currentMinute = moment(timestamp, 'mm');
-
-  
-  if ((currentHour === 0 && currentMinute <= 3) || (currentHour === 23 && currentMinute >= 57)) {
-    // Reset the emailSent flag if it's close to midnight
-    emailSent = false;
-  }
-
-  // Check if the difference in mean diff exceeds the threshold (0.01)
-  if (
-    Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_POR ||
-    Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_POR
-  ) {
-    // If an email hasn't been sent yet, or if the change exceeds 0.01
-    // since the last email, send the email
-    if (!emailSent || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_POR) || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_POR)) {
-      emailSent = true;
-      // Update previousMeanDiffs with the current mean diffs
-      previousMeanDiffs.XAG = meanDiffs.mean_diff_xag;
-      previousMeanDiffs.XAU = meanDiffs.mean_diff_xau;
-      return true;
-    }
-  }
-
-  // If the conditions are not met, no need to trigger an email
-  return false;
-}
-
 
 // Function to transform data and compare mean prices
 export function transformAndCompareData(rawData, dbData) {
@@ -126,18 +97,6 @@ export function transformAndCompareData(rawData, dbData) {
 }
 
 
-
-export function shouldUpdateData() {
-  if (
-    !isWeekend(currentTime()) &&
-    isCurrentTimeInsideInterval()
-  ) {
-    return true;
-  }
-  return false;
-}
-
-
 export async function updateAndSetMetalPrices(first=false) {
   if (first) {
     const dbdata = await getDbData();
@@ -169,21 +128,6 @@ export async function updateAndSetMetalPrices(first=false) {
     }
   }
 }
-
-// Function to start background update task
-export function startBackgroundUpdateTask() {
-  let first;
-  setInterval(async () => {
-    console.log("1 minute passed updating data...")
-    if (shouldUpdateData()) {
-      updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
-    }
-  }, UPDATE_FREQUENCY_MS);
-
-  updateAndSetMetalPrices(first=true);
-  // Call updateAndSetMetalPrices immediately when the application starts
-}
-
 
 export async function getUpdatedMetalPrices(chosenCurrency = STD_CURRENCY) {
   try {
@@ -245,38 +189,6 @@ export async function setDbData(payload) {
   } catch (error) {
     throw createHttpError(500, "Failed to set data in the database.");
   }
-}
-
-// Function to calculate the time difference between two time strings
-function timeDifference(time1, time2) {
-  const momentTime1 = moment(time1, 'HH:mm');
-  const momentTime2 = moment(time2, 'HH:mm');
-  return Math.abs(momentTime1.diff(momentTime2, 'minutes'));
-}
-
-// Function to find the closest time within a list of times that has already passed
-function findClosestPassedTime(currentTime, times) {
-  let closestTime = null;
-  let minDifference = Infinity;
-
-  const currentMoment = moment(currentTime, 'HH:mm');
-
-  for (const time of times) {
-    const momentTime = moment(time, 'HH:mm');
-    
-    // Check if the time has already passed
-    if (momentTime.isBefore(currentMoment)) {
-      const difference = currentMoment.diff(momentTime, 'minutes');
-      
-      // If it's the closest passed time found so far, update closestTime and minDifference
-      if (difference < minDifference) {
-        minDifference = difference;
-        closestTime = time;
-      }
-    }
-  }
-
-  return closestTime;
 }
 
 export async function getClosestMetalPriceData(hours, data) {
