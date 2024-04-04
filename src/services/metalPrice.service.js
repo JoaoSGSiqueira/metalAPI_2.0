@@ -15,7 +15,8 @@ const {
   STD_CURRENCY,
   HOURS_TO_SAVE,
   UPDATE_FREQUENCY_MINUTES,
-  THRESHOLD_LIMIT_POR
+  THRESHOLD_LIMIT_POR_XAG,
+  THRESHOLD_LIMIT_POR_XAU,
 } = process.env;
 const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
 
@@ -76,13 +77,13 @@ export function transformAndCompareData(rawData, dbData) {
           transformedData.info.mean_diff_xau = meanDiffPorXAU;
 
           // Check if meanDiffPorXAG passes the threshold
-          if (meanDiffPorXAU >= THRESHOLD_LIMIT_POR) {
+          if (meanDiffPorXAU >= THRESHOLD_LIMIT_POR_XAU) {
               transformedData.info.high_mean_diff_xau = true;
           } else {
               transformedData.info.high_mean_diff_xau = false;
           }
 
-          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR) {
+          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR_XAG) {
             transformedData.info.high_mean_diff_xag = true;
         } else {
             transformedData.info.high_mean_diff_xag = false;

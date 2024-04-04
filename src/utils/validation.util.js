@@ -9,7 +9,8 @@ import {
 
 dotenv.config();
 
-const {THRESHOLD_LIMIT_POR} = process.env;
+const {THRESHOLD_LIMIT_POR_XAG,
+  THRESHOLD_LIMIT_POR_XAU} = process.env;
 let previousMeanDiffs = { XAG: 0, XAU: 0};
 let emailSent_xag = false;
 let emailSent_xau = false;
@@ -36,18 +37,18 @@ export function shouldTriggerAlarm(transformedData) {
   
     // Check if the difference in mean diff exceeds the threshold (0.01)
     if (
-      Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_POR ||
-      Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_POR
+      Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= THRESHOLD_LIMIT_POR_XAG ||
+      Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= THRESHOLD_LIMIT_POR_XAU
     ) {
       // If an email hasn't been sent yet, or if the change exceeds 0.01
       // since the last email, send the email
-      if (!emailSent_xag || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_POR)) {
+      if (!emailSent_xag || Math.abs(meanDiffs.mean_diff_xag - previousMeanDiffs.XAG) >= (THRESHOLD_LIMIT_POR_XAG)) {
         emailSent_xag = true;
         // Update previousMeanDiffs with the current mean diffs
         previousMeanDiffs.XAG = meanDiffs.mean_diff_xag;
         return true;
       }
-      if (!emailSent_xau || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_POR)) {
+      if (!emailSent_xau || Math.abs(meanDiffs.mean_diff_xau - previousMeanDiffs.XAU) >= (THRESHOLD_LIMIT_POR_XAU)) {
         emailSent_xau = true;
         // Update previousMeanDiffs with the current mean diffs
         previousMeanDiffs.XAU = meanDiffs.mean_diff_xau;

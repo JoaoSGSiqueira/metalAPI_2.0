@@ -27,4 +27,6 @@ Quando estiver pronto, basta fazer uma requisição GET
 
 ```
 http://{HOST}:{PORT}/api/v1/metalprices/latest
+http://{HOST}:{PORT}/api/v1/metalprices/closest_time
+http://{HOST}:{PORT}/api/v1/metalprices/all
 ```
