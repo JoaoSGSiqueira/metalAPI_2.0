@@ -210,8 +210,10 @@ export async function getClosestMetalPriceData(hours, data) {
 
   data.forEach(entry => {
       let date = new Date(entry.timestamp * 1000);
-      let hours = date.getHours();
-      let minutes = date.getMinutes();
+      let options = { timeZone: "America/Sao_Paulo", hour: '2-digit', minute: '2-digit', hour12: false };
+      let timeString = date.toLocaleString('pt-BR', options);
+      let hours = Number(timeString.split(':')[0]);
+      let minutes = Number(timeString.split(':')[1]);
       let time = hours * 60 + minutes;
 
       let difference = Math.abs(time - closestTimestamp);
