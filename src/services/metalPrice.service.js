@@ -195,7 +195,7 @@ export async function setDbData(payload) {
 }
 
 export async function getClosestMetalPriceData(hours, data) {
-  const currentTime = moment().format('HH:mm');
+  const currentTime = moment().utcOffset(-3).format('HH:mm');
   const closestTimestamp = findClosestTime(currentTime, hours);
   console.log('Closest timestamp:', closestTimestamp);  // Corrected variable name
 
