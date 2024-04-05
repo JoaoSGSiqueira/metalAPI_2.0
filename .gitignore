@@ -131,3 +131,6 @@ dist
 
 # keys for sendgrid
 src/configs/SendGridKeys.json
+
+# tests
+tests

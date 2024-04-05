@@ -63,7 +63,7 @@ export function shouldTriggerAlarm(transformedData) {
   
   export function shouldUpdateData() {
     if (
-      !isWeekend(currentTime()) &&
+      //!isWeekend(currentTime()) &&
       isCurrentTimeInsideInterval()
     ) {
       return true;
