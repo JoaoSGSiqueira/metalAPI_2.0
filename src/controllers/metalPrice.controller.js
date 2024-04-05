@@ -6,7 +6,7 @@ import {
 } from "../services/metalPrice.service.js";
 
 dotenv.config();
-const { TIMES_TO_UPDATE } = process.env;
+const TIMES_TO_UPDATE = process.env.TIMES_TO_UPDATE.split(',');
 
 export const getMetalPrice = async (req, res, next) => {
   try {
