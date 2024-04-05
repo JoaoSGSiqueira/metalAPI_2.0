@@ -1,12 +1,13 @@
 // Import dependencies
 import dotenv from "dotenv";
 import moment from "moment";
+import fetch from "node-fetch";
 import createHttpError from "http-errors";
 import db from "../db/db.js";
 import { troyOunceToGram } from "../utils/valueConvertion.util.js";
 
 import { shouldTriggerAlarm, shouldUpdateData } from "../utils/validation.util.js";
-import { findClosestPassedTime, timeDifference } from "../utils/time.util.js";
+import { findClosestTime } from "../utils/time.util.js";
 import { sendAlarmEmail } from "../services/email.service.js";
 
 dotenv.config();
@@ -194,33 +195,34 @@ export async function setDbData(payload) {
 }
 
 export async function getClosestMetalPriceData(hours, data) {
-  try {
-      const currentTime = moment().format('HH:mm');
-      const closestTime = findClosestPassedTime(currentTime, hours);
-      let closestData = null;
-      let minDifference = Infinity; // Initialize minDifference with a very large value
+  const currentTime = moment().format('HH:mm');
+  const closestTimestamp = findClosestTime(currentTime, hours);
+  console.log('Closest timestamp:', closestTimestamp);  // Corrected variable name
 
-      for (const entry of data) {
-          const currentHour = moment(entry.timestamp * 1000).format('HH');
-          const currentMinute = moment(entry.timestamp * 1000).format('mm');
-          const stringTime = `${currentHour}:${currentMinute}`;
+  // Fetch and process data
 
-          const difference = timeDifference(stringTime, closestTime);
+  // convert to json
+  // const jsonData = await data.json();
 
-          if (difference === 0) {
-              closestData = entry;
-              break; // No need to continue searching if zero difference found
-          }
+  let closestData;
+  let closestDiff;
+  let minDifference = Infinity; // Initialize minDifference with a very large value
 
-          if (difference < minDifference) {
-              minDifference = difference;
-              closestData = entry; // Update closestData to the current entry
-          }
+  data.forEach(entry => {
+      let date = new Date(entry.timestamp * 1000);
+      let hours = date.getHours();
+      let minutes = date.getMinutes();
+      let time = hours * 60 + minutes;
+
+      let difference = Math.abs(time - closestTimestamp);
+      if (difference < minDifference) {
+          minDifference = difference; // Update minDifference to the current difference
+          closestDiff = difference;
+          closestData = entry; // Update closestData to the current entry
       }
+  });
 
-      return closestData;
-  } catch (error) {
-      console.error("Error retrieving data from Redis:", error);
-      throw createHttpError(500, "Failed to get data from the database.");
-  }
+  console.log('Closest data:', closestData);
+  console.log('Difference:', closestDiff);
+  return closestData;
 }

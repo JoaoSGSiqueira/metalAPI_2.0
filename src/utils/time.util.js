@@ -54,34 +54,31 @@ export const isCurrentTimeInsideInterval = () => {
 };
 
 
-// Function to calculate the time difference between two time strings
-export function timeDifference(time1, time2) {
-  const momentTime1 = moment(time1, 'HH:mm');
-  const momentTime2 = moment(time2, 'HH:mm');
-  return Math.abs(momentTime1.diff(momentTime2, 'minutes'));
-}
+export function findClosestTime(currentTime, timeList) {
+  // Convert current time to minutes
+  const [currentHour, currentMinute] = currentTime.split(':').map(Number);
+  const currentTimestamp = currentHour * 60 + currentMinute;
+  console.log('currentTimestamp:', currentTimestamp);
 
-// Function to find the closest time within a list of times that has already passed
-export function findClosestPassedTime(currentTime, times) {
+  // Convert time list to minutes
+  const timeMinutesList = timeList.map(timeStr => {
+      const [hour, minute] = timeStr.split(':').map(Number);
+      return hour * 60 + minute;
+  });
+  console.log('timeMinutesList:', timeMinutesList);
+  // Filter out times that have already passed
+  const validTimes = timeMinutesList.filter(time => time < currentTimestamp);
+  console.log('validTimes:', validTimes);    
+
+  // Find the closest time
   let closestTime = null;
   let minDifference = Infinity;
-
-  const currentMoment = moment(currentTime, 'HH:mm');
-
-  for (const time of times) {
-    const momentTime = moment(time, 'HH:mm');
-    
-    // Check if the time has already passed
-    if (momentTime.isBefore(currentMoment)) {
-      const difference = currentMoment.diff(momentTime, 'minutes');
-      
-      // If it's the closest passed time found so far, update closestTime and minDifference
+  for (const time of validTimes) {
+      const difference = Math.abs(time - currentTimestamp);
       if (difference < minDifference) {
-        minDifference = difference;
-        closestTime = time;
+          closestTime = time;
+          minDifference = difference;
       }
-    }
   }
-
   return closestTime;
 }
