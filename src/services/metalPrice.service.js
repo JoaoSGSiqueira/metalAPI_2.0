@@ -30,9 +30,7 @@ export function startBackgroundUpdateTask() {
   let first;
   setInterval(async () => {
     console.log("1 minute passed updating data...")
-    if (shouldUpdateData()) {
-      updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
-    }
+    updateAndSetMetalPrices(); // Call updateAndSetMetalPrices based on update frequency
   }, UPDATE_FREQUENCY_MS);
 
   updateAndSetMetalPrices(first=true);
