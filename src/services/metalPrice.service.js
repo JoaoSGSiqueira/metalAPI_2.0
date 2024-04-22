@@ -76,13 +76,13 @@ export function transformAndCompareData(rawData, dbData) {
           transformedData.info.mean_diff_xau = meanDiffPorXAU;
 
           // Check if meanDiffPorXAG passes the threshold
-          if (meanDiffPorXAU >= THRESHOLD_LIMIT_POR_XAU) {
+          if (Math.abs(meanDiffPorXAU) >= THRESHOLD_LIMIT_POR_XAU) {
               transformedData.info.high_mean_diff_xau = true;
           } else {
               transformedData.info.high_mean_diff_xau = false;
           }
 
-          if (meanDiffPorXAG >= THRESHOLD_LIMIT_POR_XAG) {
+          if (Math.abs(meanDiffPorXAG) >= THRESHOLD_LIMIT_POR_XAG) {
             transformedData.info.high_mean_diff_xag = true;
         } else {
             transformedData.info.high_mean_diff_xag = false;
