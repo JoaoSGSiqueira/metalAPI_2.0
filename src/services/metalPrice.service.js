@@ -178,6 +178,27 @@ export async function getlastDbData() {
   }
 }
 
+async function getYesterdayMetalPricesFrom() {
+  try {
+      // Get the value of "yesterday_metalPrices" key from Redis
+      const metalPricesString = await db.get("yesterday_metalPrices");
+
+      // Check if the value exists
+      if (metalPricesString) {
+          // Parse the value as JSON
+          const metalPrices = JSON.parse(metalPricesString);
+          return metalPrices;
+      } else {
+          console.error("No metal prices found in Redis for yesterday.");
+          return null;
+      }
+  } catch (error) {
+      console.error("Error fetching metal prices from Redis:", error);
+      return null;
+  }
+}
+
+
 export async function setDbData(payload) {
   try {
     const expirationTimestamp = Date.now() + HOURS_TO_SAVE_MS;
@@ -225,4 +246,92 @@ export async function getClosestMetalPriceData(hours, data) {
   console.log('Closest data:', closestData);
   console.log('Difference:', closestDiff);
   return closestData;
+}
+
+async function setMetalPriceInRedis() {
+  try {
+      // Get yesterday's metal prices
+      const response = await getYesterdayMetalPrices();
+
+      // Check if the response is valid
+      if (response && response.success) {
+          // Convert response to string (assuming it's JSON)
+          const responseString = JSON.stringify(response);
+
+          // Set the response to "yesterday_metalPrices" key in Redis
+          await db.set("yesterday_metalPrices", responseString);
+
+          console.log("Yesterday Metal prices set in Redis successfully.");
+      } else {
+          console.error("Invalid response received while fetching metal prices.");
+      }
+  } catch (error) {
+      console.error("Error fetching metal prices:", error);
+  }
+}
+
+export async function getYesterdayMetalPrices(chosenCurrency = "BRL") {
+  // Get today's date
+  let today = new Date();
+
+  // Get yesterday's date by subtracting one day (in milliseconds)
+  let yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  // Format yesterday's date as yyyy-mm-dd
+  let yesterdayFormatted = yesterday.toISOString().slice(0, 10);
+  try {
+    if (!API_KEY) {
+      throw createHttpError(500, "There is no API key.");
+    }
+
+    const url = `${apiUrl}${yesterdayFormatted}?api_key=${API_KEY}&base=${chosenCurrency}&currencies=XAU,XAG`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw createHttpError(response.status, "Failed to fetch metal prices.");
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw createHttpError(500, error.message);
+  }
+}
+
+export async function runAtSpecifiedTime(targetHour) {
+  // Get the current time in the São Paulo time zone (GMT-3)
+  const now = new Date();
+  const spTimeZoneOffset = -3 * 60; // São Paulo time zone offset in minutes (GMT-3)
+  const nowInSaoPaulo = new Date(now.getTime() + spTimeZoneOffset * 60 * 1000);
+
+  // Calculate target time for today in the São Paulo time zone
+  const targetTimeToday = new Date(nowInSaoPaulo);
+  targetTimeToday.setHours(targetHour-3, 0, 0, 0); // Set target time to the specified hour:22:00:000
+
+  // If target time has already passed today, move it to tomorrow
+  if (nowInSaoPaulo >= targetTimeToday) {
+      // Move target time to tomorrow
+      console.log("Target time has already passed today, moving it to tomorrow.")
+      targetTimeToday.setDate(targetTimeToday.getDate() + 1);
+  }
+  // Calculate the time until target time
+  const timeUntilTarget = targetTimeToday.getTime() - nowInSaoPaulo.getTime();
+  console.log("Time to wait until target time:", formatTime(timeUntilTarget));
+  console.log("Current time in São Paulo:", nowInSaoPaulo);
+  console.log("Waiting for", targetTimeToday);
+
+  // Wait until the target time
+  await new Promise(resolve => setTimeout(resolve, timeUntilTarget));
+
+  // Execute the function
+  try {
+      setMetalPriceInRedis();
+      console.log("Function executed successfully.");
+  } catch (error) {
+      console.error("Error fetching metal prices:", error);
+  }
+
+  // Schedule the function to run again tomorrow
+  runAtSpecifiedTime(targetHour);
 }

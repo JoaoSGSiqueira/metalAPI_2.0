@@ -2,9 +2,11 @@ import dotenv from "dotenv";
 import logger from "./configs/logger.config.js";
 import app from "./app.js";
 
-import {startBackgroundUpdateTask} from "./services/metalPrice.service.js";
+import {startBackgroundUpdateTask, runAtSpecifiedTime} from "./services/metalPrice.service.js";
 
 dotenv.config();
+
+const {UPDATE_YESTERDAY_METAL_PRICES} = process.env;
 
 const PORT = process.env.PORT || 8000;
 
@@ -13,6 +15,7 @@ const server = app.listen(PORT,  async () => {
   // Start the background update task
   console.log("Starting background update task");
   startBackgroundUpdateTask();
+  runAtSpecifiedTime(UPDATE_YESTERDAY_METAL_PRICES);
 });
 
 

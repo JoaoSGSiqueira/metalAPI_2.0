@@ -27,4 +27,8 @@ router.route("/all").get(trimRequest.body, getAllMetalPrices);
 
 router.route("/closest_time").get(trimRequest.body, getClosestMetalPrice);
 
+router.route("/como-vender").get(trimRequest.body, getClosestMetalPrice);
+
+router.route("/como-comprar").get(trimRequest.body, getClosestMetalPrice);
+
 export default router;

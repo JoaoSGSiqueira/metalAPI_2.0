@@ -36,3 +36,19 @@ export const getClosestMetalPrice = async (req, res, next) => {
     next(error);
   }
 }
+
+export const getComoVender = async (req, res, next) => {
+  try {
+    const currentData = await getlastDbData();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export const getComoComprar = async (req, res, next) => {
+  try {
+    const currentData = await getlastDbData();
+  } catch (error) {
+    next(error);
+  }
+}
