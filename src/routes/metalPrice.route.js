@@ -1,6 +1,6 @@
 import express from "express";
 import trimRequest from "trim-request";
-import { getMetalPrice, getAllMetalPrices, getClosestMetalPrice } from "../controllers/metalPrice.controller.js";
+import { getMetalPrice, getAllMetalPrices, getClosestMetalPrice, getComoComprar, getComoVender} from "../controllers/metalPrice.controller.js";
 
 const router = express.Router();
 
@@ -27,8 +27,8 @@ router.route("/all").get(trimRequest.body, getAllMetalPrices);
 
 router.route("/closest_time").get(trimRequest.body, getClosestMetalPrice);
 
-router.route("/como-vender").get(trimRequest.body, getClosestMetalPrice);
+router.route("/como-vender").get(trimRequest.body, getComoVender);
 
-router.route("/como-comprar").get(trimRequest.body, getClosestMetalPrice);
+router.route("/como-comprar").get(trimRequest.body, getComoComprar);
 
 export default router;

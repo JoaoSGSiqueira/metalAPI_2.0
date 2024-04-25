@@ -19,7 +19,7 @@ const {
   THRESHOLD_LIMIT_POR_XAG,
   THRESHOLD_LIMIT_POR_XAU,
 } = process.env;
-const apiUrl = `https://api.metalpriceapi.com/v1/latest?`;
+const apiUrl = `https://api.metalpriceapi.com/v1/`;
 
 // Convert hours to save and update frequency to milliseconds
 const HOURS_TO_SAVE_MS = HOURS_TO_SAVE * 60 * 60 * 1000;
@@ -136,7 +136,7 @@ export async function getUpdatedMetalPrices(chosenCurrency = STD_CURRENCY) {
       throw createHttpError(500, "There is no API key.");
     }
 
-    const url = `${apiUrl}api_key=${API_KEY}&base=${chosenCurrency}&currencies=XAU,XAG`;
+    const url = `${apiUrl}latest?api_key=${API_KEY}&base=${chosenCurrency}&currencies=XAU,XAG`;
 
     const response = await fetch(url);
 
@@ -178,7 +178,7 @@ export async function getlastDbData() {
   }
 }
 
-async function getYesterdayMetalPricesFrom() {
+export async function getYesterdayMetalPricesDb() {
   try {
       // Get the value of "yesterday_metalPrices" key from Redis
       const metalPricesString = await db.get("yesterday_metalPrices");
@@ -248,29 +248,24 @@ export async function getClosestMetalPriceData(hours, data) {
   return closestData;
 }
 
-async function setMetalPriceInRedis() {
+async function SetYesterdayMetalPriceInRedis() {
   try {
       // Get yesterday's metal prices
       const response = await getYesterdayMetalPrices();
+      console.log("Response from getYesterdayMetalPrices:", response);
+      const transformedData = transformData(response);
+      
+      const responseString = JSON.stringify(transformedData);
 
-      // Check if the response is valid
-      if (response && response.success) {
-          // Convert response to string (assuming it's JSON)
-          const responseString = JSON.stringify(response);
-
-          // Set the response to "yesterday_metalPrices" key in Redis
-          await db.set("yesterday_metalPrices", responseString);
-
-          console.log("Yesterday Metal prices set in Redis successfully.");
-      } else {
-          console.error("Invalid response received while fetching metal prices.");
-      }
-  } catch (error) {
+      // Set the response to "yesterday_metalPrices" key in Redis
+      await db.set("yesterday_metalPrices", responseString);
+      console.log("Yesterday Metal prices set in Redis successfully.");
+      } catch (error) {
       console.error("Error fetching metal prices:", error);
   }
 }
 
-export async function getYesterdayMetalPrices(chosenCurrency = "BRL") {
+export async function getYesterdayMetalPrices(chosenCurrency = STD_CURRENCY) {
   // Get today's date
   let today = new Date();
 
@@ -286,7 +281,7 @@ export async function getYesterdayMetalPrices(chosenCurrency = "BRL") {
     }
 
     const url = `${apiUrl}${yesterdayFormatted}?api_key=${API_KEY}&base=${chosenCurrency}&currencies=XAU,XAG`;
-
+    console.log("URL for fetching yesterday's metal prices:", url);
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -317,16 +312,25 @@ export async function runAtSpecifiedTime(targetHour) {
   }
   // Calculate the time until target time
   const timeUntilTarget = targetTimeToday.getTime() - nowInSaoPaulo.getTime();
-  console.log("Time to wait until target time:", formatTime(timeUntilTarget));
   console.log("Current time in São Paulo:", nowInSaoPaulo);
   console.log("Waiting for", targetTimeToday);
 
+  const data = await db.get("yesterday_metalPrices");
+  if (!data) {
+    console.log("No data found in Redis for yesterday's metal prices, fetching now.");
+      try {
+        await SetYesterdayMetalPriceInRedis();
+        console.log("Function executed successfully.");
+    } catch (error) {
+        console.error("Error fetching metal prices:", error);
+    }
+  }
   // Wait until the target time
   await new Promise(resolve => setTimeout(resolve, timeUntilTarget));
 
   // Execute the function
   try {
-      setMetalPriceInRedis();
+      await SetYesterdayMetalPriceInRedis();
       console.log("Function executed successfully.");
   } catch (error) {
       console.error("Error fetching metal prices:", error);
