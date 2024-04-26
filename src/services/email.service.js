@@ -96,7 +96,7 @@ async function gerarHtmlAvisoPrecos(jsonData) {
 
 export async function sendEmail(recipients, subject, html_content) {
   try {
-    const sendGridKeys = JSON.parse(await readFile('src/configs/sendGridKeys.json'));
+    const sendGridKeys = JSON.parse(await readFile('sendGridKeys.json'));
     const { key, senderEmail } = sendGridKeys;
 
     sgMail.setApiKey(key);
