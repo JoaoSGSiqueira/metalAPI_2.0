@@ -43,7 +43,7 @@ export const getComoVender = async (req, res, next) => {
     const currentData = await getlastDbData();
     const yesterdayData = await getYesterdayMetalPricesDb();
 
-    let result = structuredClone(currentData);
+    let result = JSON.parse(JSON.stringify(currentData));
     
     // Check if today's XAU rate is lower than yesterday's
     if (currentData.rates.XAU < yesterdayData.rates.XAU) {
@@ -70,7 +70,7 @@ export const getComoComprar = async (req, res, next) => {
     const currentData = await getlastDbData();
     const yesterdayData = await getYesterdayMetalPricesDb();
     
-    let result = structuredClone(currentData);
+    let result = JSON.parse(JSON.stringify(currentData));
     
     // Check if today's XAU rate is higher than yesterday's
     if (currentData.rates.XAU > yesterdayData.rates.XAU) {
