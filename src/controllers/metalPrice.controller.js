@@ -43,11 +43,26 @@ export const getComoVender = async (req, res, next) => {
     let venda;
     const currentData = await getlastDbData();
     const yesterdayData = await getYesterdayMetalPricesDb();
+
+    let compra = {
+      XAU: null,
+      XAG: null
+    };
+    
+    // Check if today's XAU rate is lower than yesterday's
     if (currentData.rates.XAU < yesterdayData.rates.XAU) {
-      venda = currentData
+      compra.XAU = currentData.rates.XAU;
     } else {
-      venda = yesterdayData
+      compra.XAU = yesterdayData.rates.XAU;
     }
+
+    // Check if today's XAG rate is lower than yesterday's
+    if (currentData.rates.XAG < yesterdayData.rates.XAG) {
+      compra.XAG = currentData.rates.XAG;
+    } else {
+      compra.XAG = yesterdayData.rates.XAG;
+    }
+
     return res.json(venda);
   } catch (error) {
     next(error);
@@ -56,16 +71,30 @@ export const getComoVender = async (req, res, next) => {
 
 export const getComoComprar = async (req, res, next) => {
   try {
-    let compra;
     const currentData = await getlastDbData();
     const yesterdayData = await getYesterdayMetalPricesDb();
+    
+    let compra = {
+      XAU: null,
+      XAG: null
+    };
+    
+    // Check if today's XAU rate is higher than yesterday's
     if (currentData.rates.XAU > yesterdayData.rates.XAU) {
-      compra = currentData
+      compra.XAU = currentData.rates.XAU;
     } else {
-      compra = yesterdayData
+      compra.XAU = yesterdayData.rates.XAU;
     }
+
+    // Check if today's XAG rate is higher than yesterday's
+    if (currentData.rates.XAG > yesterdayData.rates.XAG) {
+      compra.XAG = currentData.rates.XAG;
+    } else {
+      compra.XAG = yesterdayData.rates.XAG;
+    }
+
     return res.json(compra);
   } catch (error) {
     next(error);
   }
-}
+};
