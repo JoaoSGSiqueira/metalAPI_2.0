@@ -144,6 +144,7 @@ export async function getUpdatedMetalPrices(chosenCurrency = STD_CURRENCY) {
       throw createHttpError(response.status, "Failed to fetch metal prices.");
     }
 
+
     return await response.json();
   } catch (error) {
     throw createHttpError(500, error.message);
@@ -203,6 +204,7 @@ export async function setDbData(payload) {
   try {
     const expirationTimestamp = Date.now() + HOURS_TO_SAVE_MS;
     const data = JSON.stringify({ ...payload, expirationTimestamp });
+    console.log('setting data')
     await db.lpush("metalPrices", data);
     await db.ltrim("metalPrices", 0, Math.floor(HOURS_TO_SAVE_MS / UPDATE_FREQUENCY_MS)); // Keep entries for the specified hours
 
