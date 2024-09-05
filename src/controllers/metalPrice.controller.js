@@ -7,6 +7,17 @@ import {
 } from "../services/metalPrice.service.js";
 
 dotenv.config();
+const TIMES_TO_UPDATE = process.env.TIMES_TO_UPDATE ? process.env.TIMES_TO_UPDATE.split(',') : [];
+
+export const getClosestMetalPrice = async (req, res, next) => {
+  try {
+    const allData = await getDbData();
+    const closestData = await getClosestMetalPriceData(TIMES_TO_UPDATE, allData);
+    return res.json(closestData);
+  } catch (error) {
+    next(error);
+  }
+}
 
 export const getMetalPrice = async (req, res, next) => {
   try {
