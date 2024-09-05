@@ -59,7 +59,7 @@ export const getComoVender = async (req, res, next) => {
       result.rates.XAG = yesterdayData.rates.XAG;
     }
 
-    return res.json(venda);
+    return res.json(result);
   } catch (error) {
     next(error);
   }
@@ -86,7 +86,7 @@ export const getComoComprar = async (req, res, next) => {
       result.rates.XAG = yesterdayData.rates.XAG;
     }
 
-    return res.json(compra);
+    return res.json(result);
   } catch (error) {
     next(error);
   }
